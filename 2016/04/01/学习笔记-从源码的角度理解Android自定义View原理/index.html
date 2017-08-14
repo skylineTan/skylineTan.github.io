@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<!-- Head tag -->
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="google-site-verification" content="xBT4GhYoi5qRD5tr338pgPM5OWHHIDR6mNg1a3euekI" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="">
+    <meta name="keyword"  content="">
+    <link rel="shortcut icon" href="/hexo-theme-huxblog/img/favicon.ico">
+
+    <title>
+        
+          [学习笔记]从源码的角度理解Android自定义View原理 - skylineTan的博客 | skylineTan&#39;s Blog
+        
+    </title>
+
+    <link rel="canonical" href="http://skylinetan.me/hexo-theme-huxblog/2016/04/01/学习笔记-从源码的角度理解Android自定义View原理/">
+
+    <!-- Bootstrap Core CSS -->
+    <link rel="stylesheet" href="/hexo-theme-huxblog/css/bootstrap.min.css">
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/hexo-theme-huxblog/css/hux-blog.min.css">
+
+    <!-- Pygments Highlight CSS -->
+    <link rel="stylesheet" href="/hexo-theme-huxblog/css/highlight.css">
+
+    <!-- Custom Fonts -->
+    <!-- <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet" type="text/css"> -->
+    <!-- Hux change font-awesome CDN to qiniu -->
+    <link href="https://cdn.staticfile.org/font-awesome/4.5.0/css/font-awesome.min.css" rel="stylesheet" type="text/css">
+
+
+    <!-- Hux Delete, sad but pending in China
+    <link href='http://fonts.googleapis.com/css?family=Lora:400,700,400italic,700italic' rel='stylesheet' type='text/css'>
+    <link href='http://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800' rel='stylesheet' type='text/
+    css'>
+    -->
+
+
+    <!-- HTML5 Shim and Respond.js IE8 support of HTML5 elements and media queries -->
+    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
+    <!--[if lt IE 9]>
+        <script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+        <script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+    <![endif]-->
+
+    <!-- ga & ba script hoook -->
+    <script></script>
+</head>
+
+
+<!-- hack iOS CSS :active style -->
+<body ontouchstart="">
+
+    <!-- Navigation -->
+<nav class="navbar navbar-default navbar-custom navbar-fixed-top">
+    <div class="container-fluid">
+        <!-- Brand and toggle get grouped for better mobile display -->
+        <div class="navbar-header page-scroll">
+            <button type="button" class="navbar-toggle">
+                <span class="sr-only">Toggle navigation</span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+                <span class="icon-bar"></span>
+            </button>
+            <a class="navbar-brand" href="/hexo-theme-huxblog/">skylineTan</a>
+        </div>
+
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <!-- Known Issue, found by Hux:
+            <nav>'s height woule be hold on by its content.
+            so, when navbar scale out, the <nav> will cover tags.
+            also mask any touch event of tags, unfortunately.
+        -->
+        <div id="huxblog_navbar">
+            <div class="navbar-collapse">
+                <ul class="nav navbar-nav navbar-right">
+                    <li>
+                        <a href="/hexo-theme-huxblog/">Home</a>
+                    </li>
+
+                    
+
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/hexo-theme-huxblog/about/">About</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/hexo-theme-huxblog/archives/">Archives</a>
+                        </li>
+                        
+                    
+
+                        
+                        <li>
+                            <a href="/hexo-theme-huxblog/tags/">Tags</a>
+                        </li>
+                        
+                    
+                    
+                </ul>
+            </div>
+        </div>
+        <!-- /.navbar-collapse -->
+    </div>
+    <!-- /.container -->
+</nav>
+<script>
+    // Drop Bootstarp low-performance Navbar
+    // Use customize navbar with high-quality material design animation
+    // in high-perf jank-free CSS3 implementation
+    var $body   = document.body;
+    var $toggle = document.querySelector('.navbar-toggle');
+    var $navbar = document.querySelector('#huxblog_navbar');
+    var $collapse = document.querySelector('.navbar-collapse');
+
+    $toggle.addEventListener('click', handleMagic)
+    function handleMagic(e){
+        if ($navbar.className.indexOf('in') > 0) {
+        // CLOSE
+            $navbar.className = " ";
+            // wait until animation end.
+            setTimeout(function(){
+                // prevent frequently toggle
+                if($navbar.className.indexOf('in') < 0) {
+                    $collapse.style.height = "0px"
+                }
+            },400)
+        }else{
+        // OPEN
+            $collapse.style.height = "auto"
+            $navbar.className += " in";
+        }
+    }
+</script>
+
+
+    <!-- Main Content -->
+    
+<!-- Image to hack wechat -->
+<!-- <img src="http://skylinetan.me/hexo-theme-huxblog/img/icon_wechat.png" width="0" height="0"> -->
+<!-- <img src="{{ site.baseurl }}/{% if page.header-img %}{{ page.header-img }}{% else %}{{ site.header-img }}{% endif %}" width="0" height="0"> -->
+
+<!-- Post Header -->
+<style type="text/css">
+    header.intro-header{
+        background-image: url('/hexo-theme-huxblog/img/home-bg.jpg')
+    }
+</style>
+<header class="intro-header" >
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <div class="post-heading">
+                    <div class="tags">
+                        
+                          <a class="tag" href="/hexo-theme-huxblog/tags/#Android" title="Android">Android</a>
+                        
+                    </div>
+                    <h1>[学习笔记]从源码的角度理解Android自定义View原理</h1>
+                    <h2 class="subheading"></h2>
+                    <span class="meta">
+                        Posted by skylineTan on
+                        2016-04-01
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<!-- Post Content -->
+<article>
+    <div class="container">
+        <div class="row">
+
+    <!-- Post Container -->
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                post-container">
+
+                <p>这篇文章是笔者学习《Android开发艺术探索》的学习笔记，如果有不对的地方，请各位读者指出。<br><code>Activity</code>、<code>Dialog</code>、<code>Toast</code>、系统状态栏其实都是一个<code>Window</code>，<code>Window</code>是从根视图<code>DecorView</code>开始重绘，下面是一般情况下<code>DecorView</code>的结构图<br><img src="http://static.zybuluo.com/skylineTan/ulzn36ldzxq443k6xeep7ir5/Window%20%281%29.png" alt="DecorView结构图"><br><a id="more"></a><br>一、MeasureSpec(测量规格)</p>
+<ul>
+<li>定义：32位int值，高2位代表SpecMode测量模式，低30位代表SpecSize测量模式下的规格大小</li>
+<li>决定因素：<ul>
+<li>普通<code>View</code><br>取决于父容器的<code>MeasureSpec</code>和自身的<code>LayoutParams</code></li>
+<li>顶层<code>DecorView</code><br>取决于自身的<code>LayoutParams</code>和<code>Window</code>的宽或高</li>
+</ul>
+</li>
+<li>得到MeasureSpec的两种形式<br><strong>1.顶层<code>DecorView</code></strong><br><code>ViewRootImpl</code>的<code>getRootMeasureSpec</code><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/**</span></div><div class="line"><span class="comment">     * Figures out the measure spec for the root view in a window based on it's</span></div><div class="line"><span class="comment">     * layout params.</span></div><div class="line"><span class="comment">     *</span></div><div class="line"><span class="comment">     * <span class="doctag">@param</span> windowSize</span></div><div class="line"><span class="comment">     *            The available width or height of the window</span></div><div class="line"><span class="comment">     *</span></div><div class="line"><span class="comment">     * <span class="doctag">@param</span> rootDimension</span></div><div class="line"><span class="comment">     *            The layout params for one dimension (width or height) of the window.</span></div><div class="line"><span class="comment">     *</span></div><div class="line"><span class="comment">     * <span class="doctag">@return</span> The measure spec to use to measure the root view.</span></div><div class="line"><span class="comment">     */</span></div><div class="line"><span class="function"><span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">getRootMeasureSpec</span><span class="params">(<span class="keyword">int</span> windowSize, <span class="keyword">int</span> rootDimension)</span> </span>&#123;</div><div class="line">        <span class="keyword">int</span> measureSpec;</div><div class="line">        <span class="keyword">switch</span> (rootDimension) &#123;</div><div class="line"></div><div class="line">        <span class="keyword">case</span> ViewGroup.LayoutParams.MATCH_PARENT:</div><div class="line">            <span class="comment">//Window不能调整大小，强迫根视图是Window的大小</span></div><div class="line">            measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.EXACTLY);</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        <span class="keyword">case</span> ViewGroup.LayoutParams.WRAP_CONTENT:</div><div class="line">            <span class="comment">//Window能够调整大小，为根视图设置最大大小，该大小不超过Window的大小</span></div><div class="line">            measureSpec = MeasureSpec.makeMeasureSpec(windowSize, MeasureSpec.AT_MOST);</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        <span class="keyword">default</span>:</div><div class="line">            <span class="comment">//Window想要一个精确的大小，要求根视图变成这个大小</span></div><div class="line">            measureSpec = MeasureSpec.makeMeasureSpec(rootDimension, MeasureSpec.EXACTLY);</div><div class="line">            <span class="keyword">break</span>;</div><div class="line">        &#125;</div><div class="line">        <span class="keyword">return</span> measureSpec;</div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p><code>MeasureSpec</code><br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="keyword">static</span> <span class="class"><span class="keyword">class</span> <span class="title">MeasureSpec</span> </span>&#123;</div><div class="line">        <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> MODE_SHIFT = <span class="number">30</span>;</div><div class="line">        <span class="keyword">private</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> MODE_MASK  = <span class="number">0x3</span> &lt;&lt; MODE_SHIFT;</div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line"><span class="comment">         *父容器没有强加任何限制给孩子</span></div><div class="line"><span class="comment">         * 它能变成自己想要的大小</span></div><div class="line"><span class="comment">         */</span></div><div class="line">        <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> UNSPECIFIED = <span class="number">0</span> &lt;&lt; MODE_SHIFT;</div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line"><span class="comment">         * match_parent和具体数值</span></div><div class="line"><span class="comment">         * 父容器已经为孩子决定了一个精确的大小</span></div><div class="line"><span class="comment">         * 孩子被给予这个大小</span></div><div class="line"><span class="comment">         */</span></div><div class="line">        <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> EXACTLY     = <span class="number">1</span> &lt;&lt; MODE_SHIFT;</div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line"><span class="comment">         * wrap_content</span></div><div class="line"><span class="comment">         * 孩子能变成想要的大小，不超过SpecSize</span></div><div class="line"><span class="comment">         */</span></div><div class="line">        <span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">final</span> <span class="keyword">int</span> AT_MOST     = <span class="number">2</span> &lt;&lt; MODE_SHIFT;</div><div class="line"></div><div class="line">        <span class="comment">/**</span></div><div class="line"><span class="comment">         * 基于提供的大小和模式创建一个MeasureSpec的int值</span></div><div class="line"><span class="comment">         */</span></div><div class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">makeMeasureSpec</span><span class="params">(<span class="keyword">int</span> size, <span class="keyword">int</span> mode)</span> </span>&#123;</div><div class="line">            <span class="keyword">if</span> (sUseBrokenMakeMeasureSpec) &#123;</div><div class="line">                <span class="keyword">return</span> size + mode;</div><div class="line">            &#125; <span class="keyword">else</span> &#123;</div><div class="line">                <span class="keyword">return</span> (size &amp; ~MODE_MASK) | (mode &amp; MODE_MASK);</div><div class="line">            &#125;</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">getMode</span><span class="params">(<span class="keyword">int</span> measureSpec)</span> </span>&#123;</div><div class="line">            <span class="keyword">return</span> (measureSpec &amp; MODE_MASK);</div><div class="line">        &#125;</div><div class="line"></div><div class="line">        <span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">getSize</span><span class="params">(<span class="keyword">int</span> measureSpec)</span> </span>&#123;</div><div class="line">            <span class="keyword">return</span> (measureSpec &amp; ~MODE_MASK);</div><div class="line">        &#125;</div><div class="line">        <span class="comment">//代码省略......</span></div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p><strong>2.普通View</strong><br>给出完整getChildMeasureSpec代码，后面有相应的分析<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div><div class="line">39</div><div class="line">40</div><div class="line">41</div><div class="line">42</div><div class="line">43</div><div class="line">44</div><div class="line">45</div><div class="line">46</div><div class="line">47</div><div class="line">48</div><div class="line">49</div><div class="line">50</div><div class="line">51</div><div class="line">52</div><div class="line">53</div><div class="line">54</div><div class="line">55</div><div class="line">56</div><div class="line">57</div><div class="line">58</div><div class="line">59</div><div class="line">60</div><div class="line">61</div><div class="line">62</div><div class="line">63</div><div class="line">64</div><div class="line">65</div><div class="line">66</div><div class="line">67</div><div class="line">68</div><div class="line">69</div><div class="line">70</div><div class="line">71</div><div class="line">72</div></pre></td><td class="code"><pre><div class="line"><span class="comment">/**</span></div><div class="line"><span class="comment">* spec 父容器的MeasureSpec</span></div><div class="line"><span class="comment">* padding</span></div><div class="line"><span class="comment">* childDimension 孩子在LayoutParams里面指定的大小</span></div><div class="line"><span class="comment">*/</span></div><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">static</span> <span class="keyword">int</span> <span class="title">getChildMeasureSpec</span><span class="params">(<span class="keyword">int</span> spec, <span class="keyword">int</span> padding, <span class="keyword">int</span> childDimension)</span> </span>&#123;</div><div class="line">       <span class="keyword">int</span> specMode = MeasureSpec.getMode(spec);</div><div class="line">       <span class="keyword">int</span> specSize = MeasureSpec.getSize(spec);</div><div class="line"></div><div class="line">       <span class="keyword">int</span> size = Math.max(<span class="number">0</span>, specSize - padding);</div><div class="line"></div><div class="line">       <span class="keyword">int</span> resultSize = <span class="number">0</span>;</div><div class="line">       <span class="keyword">int</span> resultMode = <span class="number">0</span>;</div><div class="line"></div><div class="line">       <span class="keyword">switch</span> (specMode) &#123;</div><div class="line">       <span class="comment">// Parent has imposed an exact size on us</span></div><div class="line">       <span class="keyword">case</span> MeasureSpec.EXACTLY:</div><div class="line">           <span class="keyword">if</span> (childDimension &gt;= <span class="number">0</span>) &#123;</div><div class="line">               resultSize = childDimension;</div><div class="line">               resultMode = MeasureSpec.EXACTLY;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.MATCH_PARENT) &#123;</div><div class="line">               <span class="comment">// Child wants to be our size. So be it.</span></div><div class="line">               resultSize = size;</div><div class="line">               resultMode = MeasureSpec.EXACTLY;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.WRAP_CONTENT) &#123;</div><div class="line">               <span class="comment">// Child wants to determine its own size. It can't be</span></div><div class="line">               <span class="comment">// bigger than us.</span></div><div class="line">               resultSize = size;</div><div class="line">               resultMode = MeasureSpec.AT_MOST;</div><div class="line">           &#125;</div><div class="line">           <span class="keyword">break</span>;</div><div class="line"></div><div class="line">       <span class="comment">// Parent has imposed a maximum size on us</span></div><div class="line">       <span class="keyword">case</span> MeasureSpec.AT_MOST:</div><div class="line">           <span class="keyword">if</span> (childDimension &gt;= <span class="number">0</span>) &#123;</div><div class="line">               <span class="comment">// Child wants a specific size... so be it</span></div><div class="line">               resultSize = childDimension;</div><div class="line">               resultMode = MeasureSpec.EXACTLY;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.MATCH_PARENT) &#123;</div><div class="line">               <span class="comment">// Child wants to be our size, but our size is not fixed.</span></div><div class="line">               <span class="comment">// Constrain child to not be bigger than us.</span></div><div class="line">               resultSize = size;</div><div class="line">               resultMode = MeasureSpec.AT_MOST;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.WRAP_CONTENT) &#123;</div><div class="line">               <span class="comment">// Child wants to determine its own size. It can't be</span></div><div class="line">               <span class="comment">// bigger than us.</span></div><div class="line">               resultSize = size;</div><div class="line">               resultMode = MeasureSpec.AT_MOST;</div><div class="line">           &#125;</div><div class="line">           <span class="keyword">break</span>;</div><div class="line"></div><div class="line">       <span class="comment">// Parent asked to see how big we want to be</span></div><div class="line">       <span class="keyword">case</span> MeasureSpec.UNSPECIFIED:</div><div class="line">           <span class="keyword">if</span> (childDimension &gt;= <span class="number">0</span>) &#123;</div><div class="line">               <span class="comment">// Child wants a specific size... let him have it</span></div><div class="line">               resultSize = childDimension;</div><div class="line">               resultMode = MeasureSpec.EXACTLY;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.MATCH_PARENT) &#123;</div><div class="line">               <span class="comment">// Child wants to be our size... find out how big it should</span></div><div class="line">               <span class="comment">// be</span></div><div class="line">               resultSize = View.sUseZeroUnspecifiedMeasureSpec ? <span class="number">0</span> : size;</div><div class="line">               resultMode = MeasureSpec.UNSPECIFIED;</div><div class="line">           &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.WRAP_CONTENT) &#123;</div><div class="line">               <span class="comment">// Child wants to determine its own size.... find out how</span></div><div class="line">               <span class="comment">// big it should be</span></div><div class="line">               resultSize = View.sUseZeroUnspecifiedMeasureSpec ? <span class="number">0</span> : size;</div><div class="line">               resultMode = MeasureSpec.UNSPECIFIED;</div><div class="line">           &#125;</div><div class="line">           <span class="keyword">break</span>;</div><div class="line">       &#125;</div><div class="line">       <span class="keyword">return</span> MeasureSpec.makeMeasureSpec(resultSize, resultMode);</div><div class="line">   &#125;</div></pre></td></tr></table></figure></p>
+<p>①得到父容器的<code>SpecMode</code>和<code>SpecSize</code><br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">int</span> specMode = MeasureSpec.getMode(spec);</div><div class="line"><span class="keyword">int</span> specSize = MeasureSpec.getSize(spec);</div></pre></td></tr></table></figure></p>
+<p>②孩子的可用大小为：父容器的大小-padding，且&gt;0<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">int</span> size = Math.max(<span class="number">0</span>, specSize - padding);</div></pre></td></tr></table></figure></p>
+<p>③switch里面的判断，这里只分析一个，其他的类似<br>判断条件：父容器的<code>specMode</code></p>
+<ul>
+<li>如果孩子<code>LayoutParams</code>指定了大小，则设置为孩子指定的大小和EXACTLY模式</li>
+<li>如果孩子<code>LayoutParams</code>为MATCH_PARENT，则把父容器可以给的可用大小设置给孩子，模式为AT_MOST</li>
+<li>如果孩子<code>LayoutParams</code>为WRAP_CONTENT，则设置为孩子自己的大小，但是不能超过我们的大小<br><strong>注意：这种情况，也就是父容器为EXACTLY，当孩子为WARP_CONTENT的时候，<code>SpecSize</code>为size也就是和孩子MATCH_PARENT的效果是一样的，但是<code>SpecMode</code>为AT_MOST</strong>  <figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">case</span> MeasureSpec.EXACTLY:</div><div class="line">            <span class="keyword">if</span> (childDimension &gt;= <span class="number">0</span>) &#123;</div><div class="line">                resultSize = childDimension;</div><div class="line">                resultMode = MeasureSpec.EXACTLY;</div><div class="line">            &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.MATCH_PARENT) &#123;</div><div class="line">                <span class="comment">// Child wants to be our size. So be it.</span></div><div class="line">                resultSize = size;</div><div class="line">                resultMode = MeasureSpec.EXACTLY;</div><div class="line">            &#125; <span class="keyword">else</span> <span class="keyword">if</span> (childDimension == LayoutParams.WRAP_CONTENT) &#123;</div><div class="line">                <span class="comment">// Child wants to determine its own size. It can't be</span></div><div class="line">                <span class="comment">// bigger than us.</span></div><div class="line">                resultSize = size;</div><div class="line">                resultMode = MeasureSpec.AT_MOST;</div><div class="line">            &#125;</div><div class="line">            <span class="keyword">break</span>;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>④最后通过<code>MeasureSpec</code>这个类的静态打包方法makeMeasureSpec，根据<code>SpecMode</code>和<code>SpecSize</code>得到<code>MeasureSpec</code>的int值<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">MeasureSpec.makeMeasureSpec(resultSize, resultMode);</div></pre></td></tr></table></figure></p>
+<p>二、View的工作流程<br>流程图如下：<br><img src="http://static.zybuluo.com/skylineTan/cvyx6hzzdx9ztx0nbtjmda2y/JVM%20%286%29.png" alt="View工作流程"><br><strong>1.measure过程</strong><br><img src="http://static.zybuluo.com/skylineTan/1dfakizxnd8hyq5qiy8poeal/JVM%20%287%29.png" alt="measure过程"></p>
+<ul>
+<li><code>View</code>的measure过程<br>①measure方法最终会调用onMeasure方法，measure是一个抽象方法，不能被重写，可以重写onMeasure方法<br>measure方法的参数是自己的<code>MeasureSpec</code><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">public</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">measure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</div><div class="line">            <span class="comment">//代码省略...</span></div><div class="line">            onMeasure(widthMeasureSpec, heightMeasureSpec);</div><div class="line">            <span class="comment">//...</span></div><div class="line">    &#125;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>②onMeasure方法<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">onMeasure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</div><div class="line">        setMeasuredDimension(getDefaultSize(getSuggestedMinimumWidth(), widthMeasureSpec), getDefaultSize(getSuggestedMinimumHeight(), heightMeasureSpec));</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p>③在不考虑MeasureSpec.UNSPECIFIED的情况下，getDefaultSize这个方法返回的是<code>SpecSize</code>也就是测量的大小<br>④setMeasureDimension和setMeasureDimensionRaw方法<br>作用是设置View宽/高的测量值<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">final</span> <span class="keyword">void</span> <span class="title">setMeasuredDimension</span><span class="params">(<span class="keyword">int</span> measuredWidth, <span class="keyword">int</span> measuredHeight)</span> </span>&#123;</div><div class="line">        <span class="comment">//代码省略...</span></div><div class="line">        setMeasuredDimensionRaw(measuredWidth, measuredHeight);</div><div class="line">    &#125;</div><div class="line">    </div><div class="line">    <span class="function"><span class="keyword">private</span> <span class="keyword">void</span> <span class="title">setMeasuredDimensionRaw</span><span class="params">(<span class="keyword">int</span> measuredWidth, <span class="keyword">int</span> measuredHeight)</span> </span>&#123;</div><div class="line">        mMeasuredWidth = measuredWidth;</div><div class="line">        mMeasuredHeight = measuredHeight;</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+<p>⑤自定义<code>View</code>的时候，重写onMeasure方法，并且在里面先调用父类的onMeasure方法，如果是wrap_content的时候，需要重新setMeasureDimension设置新的测量的大小，这里的大小可以自行设定<br>所以onMeasure这个方法主要是得到测量宽高的大小，通过setMeasureDimension这个方法，如果没有调用这个方法，就无法通过getMeasureHeight或者getMeasureWidth得到测量的宽和高</p>
+<ul>
+<li><code>ViewGroup</code>的measure过程<br>完成自身的measure过程和遍历调用子元素的measure方法<br><code>ViewGroup</code>继承自<code>View</code>，但是没有重写<code>View</code>的onMeasure方法，提供了measureChildren方法<br>1.measureChildren和measureChild方法<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div></pre></td><td class="code"><pre><div class="line"><span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">measureChildren</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</div><div class="line">       <span class="keyword">final</span> <span class="keyword">int</span> size = mChildrenCount;</div><div class="line">       <span class="keyword">final</span> View[] children = mChildren;</div><div class="line">       <span class="keyword">for</span> (<span class="keyword">int</span> i = <span class="number">0</span>; i &lt; size; ++i) &#123;</div><div class="line">           <span class="keyword">final</span> View child = children[i];</div><div class="line">           <span class="keyword">if</span> ((child.mViewFlags &amp; VISIBILITY_MASK) != GONE) &#123;</div><div class="line">               measureChild(child, widthMeasureSpec, heightMeasureSpec);</div><div class="line">           &#125;</div><div class="line">       &#125;</div><div class="line">   &#125;</div><div class="line">   </div><div class="line">   <span class="comment">//根据parent的MeasureSpec得到孩子的MeasureSpec</span></div><div class="line">   <span class="comment">//再调用孩子的measure方法</span></div><div class="line">   <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">measureChild</span><span class="params">(View child, <span class="keyword">int</span> parentWidthMeasureSpec,</span></span></div><div class="line"><span class="function"><span class="params">           <span class="keyword">int</span> parentHeightMeasureSpec)</span> </span>&#123;</div><div class="line">       <span class="keyword">final</span> LayoutParams lp = child.getLayoutParams();</div><div class="line"></div><div class="line">       <span class="keyword">final</span> <span class="keyword">int</span> childWidthMeasureSpec = getChildMeasureSpec(parentWidthMeasureSpec,</div><div class="line">               mPaddingLeft + mPaddingRight, lp.width);</div><div class="line">       <span class="keyword">final</span> <span class="keyword">int</span> childHeightMeasureSpec = getChildMeasureSpec(parentHeightMeasureSpec,</div><div class="line">               mPaddingTop + mPaddingBottom, lp.height);</div><div class="line"></div><div class="line">       child.measure(childWidthMeasureSpec, childHeightMeasureSpec);</div><div class="line">   &#125;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>2.需要在我们继承的<code>ViewGroup</code>的onMeasure里面根据不同的情况调用measureChildren或者measureChild方法，从而完成对孩子的测量，ViewGroup的onMeasure方法没有对其做统一实现<br>一般情况下在我们自定义的<code>ViewGroup</code>的onMeasure里面调用下面这句就好<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div></pre></td><td class="code"><pre><div class="line">measureChildren(widthMeasureSpec,heightMeasureSpec);</div></pre></td></tr></table></figure></p>
+<ul>
+<li>应用<br>那么知道了measure的原理之后，自定义View的时候要怎么用呢？<br>同样分自定义<code>View</code>和<code>ViewGroup</code>两种<br>自定义View：只需要对WRAP_CONTENT的情况进行测量就好了，具体原因，请看我前面写的<strong>注意</strong>，在不重写的情况下，WRAP_CONTENT和MATCH_PARENT没有区别，当然这不是我们想要的结果<figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div><div class="line">8</div><div class="line">9</div><div class="line">10</div><div class="line">11</div><div class="line">12</div><div class="line">13</div><div class="line">14</div><div class="line">15</div><div class="line">16</div><div class="line">17</div><div class="line">18</div><div class="line">19</div><div class="line">20</div><div class="line">21</div><div class="line">22</div><div class="line">23</div><div class="line">24</div><div class="line">25</div><div class="line">26</div><div class="line">27</div><div class="line">28</div><div class="line">29</div><div class="line">30</div><div class="line">31</div><div class="line">32</div><div class="line">33</div><div class="line">34</div><div class="line">35</div><div class="line">36</div><div class="line">37</div><div class="line">38</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">public</span> <span class="class"><span class="keyword">class</span> <span class="title">SkylineTanView</span> <span class="keyword">extends</span> <span class="title">View</span></span>&#123;</div><div class="line"></div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="title">SkylineTanView</span><span class="params">(Context context)</span> </span>&#123;</div><div class="line">        <span class="keyword">super</span>(context);</div><div class="line">    &#125;</div><div class="line">    </div><div class="line">    <span class="function"><span class="keyword">public</span> <span class="title">SkylineTanView</span><span class="params">(Context context, AttributeSet attrs)</span></span>&#123;</div><div class="line">        <span class="keyword">super</span>(context, attrs);</div><div class="line">    &#125;</div><div class="line"></div><div class="line">    <span class="meta">@Override</span></div><div class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">onMeasure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</div><div class="line">        <span class="comment">//按源码分析，这句是调用View的onMeasure方法</span></div><div class="line">        <span class="comment">//对EXACTLY和UNSPECIFIED的情况进行了测量</span></div><div class="line">        <span class="comment">//得到了测量的宽和高</span></div><div class="line">        <span class="keyword">super</span>.onMeasure(widthMeasureSpec, heightMeasureSpec);</div><div class="line">        <span class="comment">//得到SpecMode和SpecSize</span></div><div class="line">        <span class="keyword">int</span> widthSpaceSize = MeasureSpec.getSize(widthMeasureSpec);</div><div class="line">        <span class="keyword">int</span> widthSpecMode = MeasureSpec.getMode(widthMeasureSpec);</div><div class="line">        <span class="keyword">int</span> heightSpaceSize = MeasureSpec.getSize(heightMeasureSpec);</div><div class="line">        <span class="keyword">int</span> heightSpecMode = MeasureSpec.getMode(heightMeasureSpec);</div><div class="line"></div><div class="line">        <span class="comment">//给定的测量的宽/高，这里我写的屏幕长和宽的一半</span></div><div class="line">        <span class="comment">//你也可以自行给定宽/高的值,比如下面设置为32dp</span></div><div class="line">        <span class="comment">//measureWidth=DensityUtils.dp2Px(getContext(),32)</span></div><div class="line">        <span class="keyword">int</span> measureWidth = ScreenUtils.getScreenWidth()/<span class="number">2</span>;</div><div class="line">        <span class="keyword">int</span> measureHeight = ScreenUtils.getScreenHeight()/<span class="number">2</span>;</div><div class="line"></div><div class="line">        <span class="keyword">if</span>(widthSpecMode == MeasureSpec.AT_MOST &amp;&amp; heightSpecMode == MeasureSpec.AT_MOST)&#123;</div><div class="line">            setMeasuredDimension(Math.min(measureWidth,widthSpaceSize), Math.min(measureHeight, heightSpaceSize));</div><div class="line">        &#125;<span class="keyword">else</span> <span class="keyword">if</span>(widthMeasureSpec == MeasureSpec.AT_MOST)&#123;</div><div class="line">            setMeasuredDimension(Math.min(measureWidth,widthSpaceSize), heightSpaceSize);</div><div class="line">        &#125;<span class="keyword">else</span> <span class="keyword">if</span>(heightMeasureSpec == MeasureSpec.AT_MOST)&#123;</div><div class="line">            setMeasuredDimension(widthSpaceSize,Math.min(measureHeight, heightSpaceSize));</div><div class="line">        &#125;</div><div class="line">    &#125;</div><div class="line">    </div><div class="line">&#125;</div></pre></td></tr></table></figure>
+</li>
+</ul>
+<p>下面加以说明：<br>这里是对宽/高的<code>SpecMode</code>进行判断，如果是AT_MOST也就是WRAP_CONTENT的情况，就设定为给定的宽/高，但是给定的宽/高，不能超过父容器有效剩余长度(自身的大小-自身padding-子<code>View</code>的margin)，所以需要用Math.min(measureHeight, heightSpaceSize)，否则会超过当前<code>View</code>所在<code>ViewGroup</code><br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="keyword">if</span>(widthSpecMode == MeasureSpec.AT_MOST &amp;&amp; heightSpecMode == MeasureSpec.AT_MOST)&#123;</div><div class="line">           setMeasuredDimension(Math.min(measureWidth,widthSpaceSize), Math.min(measureHeight, heightSpaceSize));</div><div class="line">       &#125;<span class="keyword">else</span> <span class="keyword">if</span>(widthMeasureSpec == MeasureSpec.AT_MOST)&#123;</div><div class="line">           setMeasuredDimension(Math.min(measureWidth,widthSpaceSize), heightSpaceSize);</div><div class="line">       &#125;<span class="keyword">else</span> <span class="keyword">if</span>(heightMeasureSpec == MeasureSpec.AT_MOST)&#123;</div><div class="line">           setMeasuredDimension(widthSpaceSize,Math.min(measureHeight, heightSpaceSize));</div><div class="line">       &#125;</div></pre></td></tr></table></figure></p>
+<p>自定义ViewGroup：一般情况下，直接调用measureChildren方法对子<code>View</code>进行测量即可，因为<code>ViewGroup</code>虽然继承了<code>View</code>，但是没有重写onMeasure方法<br><figure class="highlight java"><table><tr><td class="gutter"><pre><div class="line">1</div><div class="line">2</div><div class="line">3</div><div class="line">4</div><div class="line">5</div><div class="line">6</div><div class="line">7</div></pre></td><td class="code"><pre><div class="line"><span class="meta">@Override</span></div><div class="line">    <span class="function"><span class="keyword">protected</span> <span class="keyword">void</span> <span class="title">onMeasure</span><span class="params">(<span class="keyword">int</span> widthMeasureSpec, <span class="keyword">int</span> heightMeasureSpec)</span> </span>&#123;</div><div class="line">        <span class="keyword">super</span>.onMeasure(widthMeasureSpec, heightMeasureSpec);</div><div class="line">        <span class="comment">//和View一样，对自身WRAP_CONTENT的情况进行判断</span></div><div class="line">        <span class="comment">//代码省略...</span></div><div class="line">        measureChildren(widthMeasureSpec,heightMeasureSpec);</div><div class="line">    &#125;</div></pre></td></tr></table></figure></p>
+
+
+                <hr>
+
+                
+
+                <ul class="pager">
+                    
+                        <li class="previous">
+                            <a href="/hexo-theme-huxblog/2016/06/02/Android基于Messenger的进程间通信/" data-toggle="tooltip" data-placement="top" title="Android基于Messenger的进程间通信">&larr; Previous Post</a>
+                        </li>
+                    
+                    
+                        <li class="next">
+                            <a href="/hexo-theme-huxblog/2016/03/28/学习笔记-WindowManager源码分析/" data-toggle="tooltip" data-placement="top" title="[学习笔记]WindowManager源码分析">Next Post &rarr;</a>
+                        </li>
+                    
+                </ul>
+
+                
+
+                
+
+            </div>
+    <!-- Side Catalog Container -->
+        
+
+    <!-- Sidebar Container -->
+
+            <div class="
+                col-lg-8 col-lg-offset-2
+                col-md-10 col-md-offset-1
+                sidebar-container">
+
+                <!-- Featured Tags -->
+                
+                <section>
+                    <!-- no hr -->
+                    <h5><a href="/hexo-theme-huxblog/tags/">FEATURED TAGS</a></h5>
+                    <div class="tags">
+                       
+                          <a class="tag" href="/hexo-theme-huxblog/tags/#Android" title="Android">Android</a>
+                        
+                    </div>
+                </section>
+                
+
+                <!-- Friends Blog -->
+                
+                <hr>
+                <h5>FRIENDS</h5>
+                <ul class="list-inline">
+
+                    
+                        <li><a href="http://skylinetan.me" target="_blank">skylineTan&#39;s Blog</a></li>
+                    
+                </ul>
+                
+            </div>
+
+        </div>
+    </div>
+</article>
+
+
+
+
+
+
+
+<!-- async load function -->
+<script>
+    function async(u, c) {
+      var d = document, t = 'script',
+          o = d.createElement(t),
+          s = d.getElementsByTagName(t)[0];
+      o.src = u;
+      if (c) { o.addEventListener('load', function (e) { c(null, e); }, false); }
+      s.parentNode.insertBefore(o, s);
+    }
+</script>
+<!-- anchor-js, Doc:http://bryanbraun.github.io/anchorjs/ -->
+<script>
+    async("https://cdn.bootcss.com/anchor-js/1.1.1/anchor.min.js",function(){
+        anchors.options = {
+          visible: 'always',
+          placement: 'right',
+          icon: '#'
+        };
+        anchors.add().remove('.intro-header h1').remove('.subheading').remove('.sidebar-container h5');
+    })
+</script>
+<style>
+    /* place left on bigger screen */
+    @media all and (min-width: 800px) {
+        .anchorjs-link{
+            position: absolute;
+            left: -0.75em;
+            font-size: 1.1em;
+            margin-top : -0.1em;
+        }
+    }
+</style>
+
+
+
+    <!-- Footer -->
+    <!-- Footer -->
+<footer>
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-8 col-lg-offset-2 col-md-10 col-md-offset-1">
+                <ul class="list-inline text-center">
+                
+                
+                    <li>
+                        <a target="_blank" href="https://twitter.com/skylineTan">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-twitter fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+                
+                    <li>
+                        <a target="_blank" href="https://www.zhihu.com/people/skylineTan">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa  fa-stack-1x fa-inverse">知</i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank" href="http://weibo.com/skylineTan_">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-weibo fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank" href="https://www.facebook.com/skylineTan">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-facebook fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://github.com/skylineTan">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-github fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                
+                    <li>
+                        <a target="_blank"  href="https://www.linkedin.com/in/skylineTan">
+                            <span class="fa-stack fa-lg">
+                                <i class="fa fa-circle fa-stack-2x"></i>
+                                <i class="fa fa-linkedin fa-stack-1x fa-inverse"></i>
+                            </span>
+                        </a>
+                    </li>
+                
+
+                </ul>
+                <p class="copyright text-muted">
+                    Copyright &copy; skylineTan 2017 
+                    <br>
+                    Theme by <a href="http://huangxuan.me">Hux</a> 
+                    <span style="display: inline-block; margin: 0 5px;">
+                        <i class="fa fa-heart"></i>
+                    </span> 
+                    Ported by <a href="http://blog.kaijun.rocks">Kaijun</a> | 
+                    <iframe
+                        style="margin-left: 2px; margin-bottom:-5px;"
+                        frameborder="0" scrolling="0" width="91px" height="20px"
+                        src="https://ghbtns.com/github-btn.html?user=kaijun&repo=hexo-theme-huxblog&type=star&count=true" >
+                    </iframe>
+                </p>
+            </div>
+        </div>
+    </div>
+</footer>
+
+<!-- jQuery -->
+<script src="/hexo-theme-huxblog/js/jquery.min.js"></script>
+
+<!-- Bootstrap Core JavaScript -->
+<script src="/hexo-theme-huxblog/js/bootstrap.min.js"></script>
+
+<!-- Custom Theme JavaScript -->
+<script src="/hexo-theme-huxblog/js/hux-blog.min.js"></script>
+
+
+<!-- async load function -->
+<script>
+    function async(u, c) {
+      var d = document, t = 'script',
+          o = d.createElement(t),
+          s = d.getElementsByTagName(t)[0];
+      o.src = u;
+      if (c) { o.addEventListener('load', function (e) { c(null, e); }, false); }
+      s.parentNode.insertBefore(o, s);
+    }
+</script>
+
+<!-- 
+     Because of the native support for backtick-style fenced code blocks 
+     right within the Markdown is landed in Github Pages, 
+     From V1.6, There is no need for Highlight.js, 
+     so Huxblog drops it officially.
+
+     - https://github.com/blog/2100-github-pages-now-faster-and-simpler-with-jekyll-3-0  
+     - https://help.github.com/articles/creating-and-highlighting-code-blocks/    
+-->
+<!--
+    <script>
+        async("http://cdn.bootcss.com/highlight.js/8.6/highlight.min.js", function(){
+            hljs.initHighlightingOnLoad();
+        })
+    </script>
+    <link href="http://cdn.bootcss.com/highlight.js/8.6/styles/github.min.css" rel="stylesheet">
+-->
+
+
+<!-- jquery.tagcloud.js -->
+<script>
+    // only load tagcloud.js in tag.html
+    if($('#tag_cloud').length !== 0){
+        async("http://skylinetan.me/hexo-theme-huxblog/js/jquery.tagcloud.js",function(){
+            $.fn.tagcloud.defaults = {
+                //size: {start: 1, end: 1, unit: 'em'},
+                color: {start: '#bbbbee', end: '#0085a1'},
+            };
+            $('#tag_cloud a').tagcloud();
+        })
+    }
+</script>
+
+<!--fastClick.js -->
+<script>
+    async("https://cdn.bootcss.com/fastclick/1.0.6/fastclick.min.js", function(){
+        var $nav = document.querySelector("nav");
+        if($nav) FastClick.attach($nav);
+    })
+</script>
+
+
+<!-- Google Analytics -->
+
+
+<script>
+    // dynamic User by Hux
+    var _gaId = 'UA-49627206-1';
+    var _gaDomain = 'skylinetan.me';
+
+    // Originial
+    (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+    (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+    m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+    })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+    ga('create', _gaId, _gaDomain);
+    ga('send', 'pageview');
+</script>
+
+
+
+
+<!-- Baidu Tongji -->
+
+<script>
+    // dynamic User by Hux
+    var _baId = '4cc1f2d8f3067386cc5cdb626a202900';
+
+    // Originial
+    var _hmt = _hmt || [];
+    (function() {
+      var hm = document.createElement("script");
+      hm.src = "//hm.baidu.com/hm.js?" + _baId;
+      var s = document.getElementsByTagName("script")[0];
+      s.parentNode.insertBefore(hm, s);
+    })();
+</script>
+
+
+<!-- Side Catalog -->
+
+
+
+
+
+<!-- Image to hack wechat -->
+<img src="http://skylinetan.me/hexo-theme-huxblog/img/icon_wechat.png" width="0" height="0" />
+<!-- Migrate from head to bottom, no longer block render and still work -->
+
+</body>
+
+</html>
